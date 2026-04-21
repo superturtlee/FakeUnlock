@@ -363,4 +363,16 @@ static UINT32 add_with_reg(UINT32 raw, UINT8 new_reg) {
     raw = (raw & ~(0x1Fu << 5)) | ((UINT32)(new_reg & 0x1Fu) << 5);
     return raw;
 }
+/*
+static BOOLEAN decode_inst_strb_imm(UINT32 raw, DecodedInst* out) {
+    if ((raw & 0xFFC00000) != 0x39000000) return FALSE;
+    out->type = INST_STRB_IMM;
+    out->raw  = raw;
+    out->rt   = raw & 0x1F;
+    out->rn   = (raw >> 5) & 0x1F;
+    out->imm  = (raw >> 10) & 0xFFF;
+    return TRUE;
+}
+*/
+//change STRB_with_reg to STRB_imm, which can change the immediate value of STRB instruction
 #endif

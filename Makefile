@@ -70,13 +70,6 @@ build_generic: clean
 build_patcher_android: clean
 	$(NDK_PATH)/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android31-clang tools/patch_abl.c -o dist/patch_abl_android
 	bash ./tools/build_extractfv_android.sh
-build_module: build_patcher_android
-	mv dist/patch_abl_android magisk_module/bin/patch_abl
-	mv dist/extractfv_android magisk_module/bin/extractfv
-	mkdir release || true
-	cd magisk_module && zip -r ../release/$(DIST_NAME).zip ./
-	rm magisk_module/bin/patch_abl
-	rm magisk_module/bin/extractfv
 
 test_exploit:
 	@echo "This script is used to test the ABL exploit. Please make sure you tested before ota."
@@ -90,5 +83,3 @@ test_exploit:
 test_boot: build
 	fastboot boot ./dist/ABL_with_superfastboot.efi
 
-test:
-	bash ./tests/runall.sh

@@ -381,8 +381,8 @@ INT32 find_ldrB_instructio_reverse(CHAR8* buffer, INT32 size,
                    (UINT8)buffer[now_offset], (UINT8)buffer[now_offset+1],
                    (UINT8)buffer[now_offset+2], (UINT8)buffer[now_offset+3]);
             #ifndef DISABLE_PATCH_4
-            write_instr(buffer, now_offset, encode_movz_w((UINT8)current_target, 1));
-            Print_patcher("  After : %02X %02X %02X %02X (MOV W%d, #1)\n",
+            write_instr(buffer, now_offset, encode_movz_w((UINT8)current_target, 0));//强制启用AVB
+            Print_patcher("  After : %02X %02X %02X %02X (MOV W%d, #0)\n",
                    (UINT8)buffer[now_offset], (UINT8)buffer[now_offset+1],
                    (UINT8)buffer[now_offset+2], (UINT8)buffer[now_offset+3],
                    (int)current_target);
@@ -465,8 +465,8 @@ INT32 patch_adrl_unlocked_to_locked(CHAR8* buffer, INT32 size, UINT64 load_base)
         Print_patcher("  [0x%X] ADRP+ADD X%d -> file:0x%llX \"androidboot.vbmeta.device_state\"\n",
                i+16, xc, (unsigned long long)off2);
 
-        UINT32 new_adrp = adrp_with_rd(b0.raw, xa);
-        UINT32 new_add  = add_with_reg(b1.raw, xa);
+        UINT32 new_adrp = adrp_with_rd(b0.raw, xb);
+        UINT32 new_add  = add_with_reg(b1.raw, xb);
 
         Print_patcher("  Patch pair-0: ADRP %08X->%08X, ADD %08X->%08X\n",
                a0.raw, new_adrp, a1.raw, new_add);
@@ -514,56 +514,19 @@ INT32 patch_adrl_unlocked_to_locked_verify(CHAR8* buffer, INT32 size, UINT64 loa
         INT64 off1 = calc_adrl_file_offset(buffer, i + 8,  load_base);
         INT64 off2 = calc_adrl_file_offset(buffer, i + 16, load_base);
 
-        if (!str_at(buffer, size, off0, "locked")) continue;
-        if (!str_at(buffer, size, off1, "locked")) continue;
+        if (!str_at(buffer, size, off0, "unlocked")) continue;
+        if (!str_at(buffer, size, off1, "unlocked")) continue;
         if (!str_at(buffer, size, off2, "androidboot.vbmeta.device_state")) continue;
 
         Print_patcher("Found ADRL triple at 0x%X:\n", i);
-        Print_patcher("  [0x%X] ADRP+ADD X%d -> file:0x%llX \"locked\"\n",
+        Print_patcher("  [0x%X] ADRP+ADD X%d -> file:0x%llX \"unlocked\"\n",
                i, xa, (unsigned long long)off0);
-        Print_patcher("  [0x%X] ADRP+ADD X%d -> file:0x%llX \"locked\"\n",
+        Print_patcher("  [0x%X] ADRP+ADD X%d -> file:0x%llX \"unlocked\"\n",
                i+8, xb, (unsigned long long)off1);
         Print_patcher("  [0x%X] ADRP+ADD X%d -> file:0x%llX \"androidboot.vbmeta.device_state\"\n",
                i+16, xc, (unsigned long long)off2);
         patched++;
         i += 20;
-    }
-    return patched;
-}
-CHAR8 keyword []="is not allowed in Lock State";
-BOOLEAN check_sub_string(CHAR8* str,CHAR8* keyword){
-    INT32 len = 0;
-    INT32 str_len = 0;
-    while(str[str_len]) str_len++;
-    while(keyword[len]) len++;
-    for (INT32 i = 0; i <= str_len - len; ++i) {
-        if (memcmp_patcher(str + i, keyword, len) == 0) {
-            return TRUE;
-        }
-    }
-    return FALSE;
-}
-BOOLEAN patch_string_jump(CHAR8* buffer, INT32 size) {
-    BOOLEAN patched = FALSE;
-    for(int i = 0; i < size - 4; i += 4) {
-        DecodedInst d = decode_at(buffer, i);
-        INT64 jmp=0;
-        if(get_JUMP_target(&d,i,&jmp)){
-            if (jmp < 0 || jmp + 8 > size) continue;
-            DecodedInst a0 = decode_at(buffer, jmp);
-            DecodedInst a1 = decode_at(buffer, jmp + 4);
-            if (a0.type != INST_ADRP || a1.type != INST_ADD_X_IMM) continue;
-            if (a1.rt != a0.rt || a1.rn != a0.rt) continue;
-            INT64 off0 = calc_adrl_file_offset(buffer, jmp, 0);
-            if (off0 < 0 || off0 >= size) continue;
-            CHAR8* str = buffer + off0;
-            if(check_sub_string(str, keyword)){
-                Print_patcher("  String: %s\n", str);
-                //nop the jump instruction
-                write_instr(buffer, i, NOP); // NOP
-                patched = TRUE;
-            }
-        }
     }
     return patched;
 }
@@ -584,10 +547,6 @@ BOOLEAN PatchBuffer(CHAR8* data, INT32 size) {
         free(data);
         return FALSE;
     }
-    #endif
-    #ifndef DISABLE_PATCH_6
-    if (patch_string_jump(data, size) != 0)
-    Print_patcher("Warning: Failed to patch string jump\n");
     #endif
     INT32 offset = -1;
     INT8 lock_register_num = -1;
